@@ -51,20 +51,27 @@ export const Admin = () => {
   const fetchTeams = async () => {
     try {
       setLoading(true);
+      setError('');
       const { data, error } = await supabase
         .from('teams')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setTeams(data);
-        if (data.length > 0) {
-          setSelectedTeam(data[0].id);
-          fetchTeamMembers(data[0].id);
-        }
+      if (error) {
+        console.error('Supabase error fetching teams:', error);
+        setError('Failed to load teams: ' + error.message);
+        return;
+      }
+
+      console.log('Teams fetched:', data);
+      setTeams(data || []);
+      if (data && data.length > 0) {
+        setSelectedTeam(data[0].id);
+        fetchTeamMembers(data[0].id);
       }
     } catch (err) {
       console.error('Error fetching teams:', err);
+      setError('Error fetching teams: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -78,11 +85,17 @@ export const Admin = () => {
         .eq('team_id', teamId)
         .order('joined_at', { ascending: false });
 
-      if (!error && data) {
-        setTeamMembers(data);
+      if (error) {
+        console.error('Supabase error fetching team members:', error);
+        setError('Failed to load team members: ' + error.message);
+        return;
       }
+
+      console.log('Team members fetched:', data);
+      setTeamMembers(data || []);
     } catch (err) {
       console.error('Error fetching team members:', err);
+      setError('Error fetching team members: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 

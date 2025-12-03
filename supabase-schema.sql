@@ -83,22 +83,13 @@ ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for employees table
 CREATE POLICY "Users can view their own employee profile" ON employees
-  FOR SELECT USING (auth.uid() = user_id OR auth.uid() IN (
-    SELECT user_id FROM employees WHERE id = employees.id
-  ));
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own employee profile" ON employees
   FOR UPDATE USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can view team members if in same team" ON employees
-  FOR SELECT USING (
-    auth.uid() IN (
-      SELECT user_id FROM team_members 
-      WHERE team_id IN (
-        SELECT team_id FROM team_members WHERE user_id = auth.uid()
-      )
-    ) OR auth.uid() = user_id
-  );
+CREATE POLICY "Users can insert their own employee profile" ON employees
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policies for timesheets table
 CREATE POLICY "Users can view their own timesheets" ON timesheets
