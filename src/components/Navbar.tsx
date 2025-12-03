@@ -44,7 +44,7 @@ export const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center gap-3">
             <img 
-              src="https://ytepzyundsauhctalwgw.supabase.co/storage/v1/object/public/logo/logo" 
+              src="https://ytepzyundsauhctalwgw.supabase.co/storage/v1/object/public/logo/logo.png" 
               alt="Starcast Media Logo"
               className="h-14 w-14 rounded-full object-cover"
               style={{ transform: 'scale(1.1)' }}

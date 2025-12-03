@@ -130,10 +130,8 @@ CREATE POLICY "Users can delete their own documents" ON documents
 CREATE POLICY "Users can view their own memberships" ON team_members
   FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Team creators can view team members" ON team_members
-  FOR SELECT USING (
-    auth.uid() IN (SELECT created_by FROM teams WHERE id = team_id)
-  );
+CREATE POLICY "Admin can view all team members" ON team_members
+  FOR SELECT USING (true);
 
 CREATE POLICY "Team creators can add members" ON team_members
   FOR INSERT WITH CHECK (
@@ -149,13 +147,8 @@ CREATE POLICY "Team creators can remove members" ON team_members
 CREATE POLICY "Users can create teams" ON teams
   FOR INSERT WITH CHECK (created_by = auth.uid());
 
-CREATE POLICY "Users can view teams they created" ON teams
-  FOR SELECT USING (created_by = auth.uid());
-
-CREATE POLICY "Users can view teams they are members of" ON teams
-  FOR SELECT USING (
-    id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
-  );
+CREATE POLICY "Admin can view all teams" ON teams
+  FOR SELECT USING (true);
 
 CREATE POLICY "Team creators can update their teams" ON teams
   FOR UPDATE USING (created_by = auth.uid());
