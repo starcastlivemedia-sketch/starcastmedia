@@ -1,26 +1,57 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader, CheckCircle } from 'lucide-react';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Check for email confirmation redirect
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const email_from_url = searchParams.get('email');
+    
+    if (type === 'recovery' || type === 'signup') {
+      setSuccess('Email confirmed! You can now log in.');
+      if (email_from_url) {
+        setEmail(decodeURIComponent(email_from_url));
+      }
+    }
+
+    // If already logged in, redirect to dashboard
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [searchParams, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      // Give auth state time to update
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      if (errorMessage.includes('Email not confirmed')) {
+        setError('Please confirm your email address first. Check your inbox for a confirmation link.');
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        setError('Invalid email or password');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -41,6 +72,13 @@ export const Login = () => {
                 <div className="flex items-center gap-3 p-4 bg-red-900/20 border border-red-500/50 rounded-lg">
                   <AlertCircle className="text-red-400" size={20} />
                   <span className="text-red-300 text-sm">{error}</span>
+                </div>
+              )}
+
+              {success && (
+                <div className="flex items-center gap-3 p-4 bg-green-900/20 border border-green-500/50 rounded-lg">
+                  <CheckCircle className="text-green-400" size={20} />
+                  <span className="text-green-300 text-sm">{success}</span>
                 </div>
               )}
 

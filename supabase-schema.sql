@@ -46,17 +46,7 @@ CREATE TABLE IF NOT EXISTS documents (
   updated_at TIMESTAMP DEFAULT now()
 );
 
--- Team memberships table
-CREATE TABLE IF NOT EXISTS team_members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  role VARCHAR(100),
-  joined_at TIMESTAMP DEFAULT now(),
-  UNIQUE(user_id, team_id)
-);
-
--- Teams table
+-- Teams table (must come before team_members)
 CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
@@ -64,6 +54,16 @@ CREATE TABLE IF NOT EXISTS teams (
   created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()
+);
+
+-- Team memberships table (references teams table)
+CREATE TABLE IF NOT EXISTS team_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  role VARCHAR(100),
+  joined_at TIMESTAMP DEFAULT now(),
+  UNIQUE(user_id, team_id)
 );
 
 -- Create indexes for better query performance
