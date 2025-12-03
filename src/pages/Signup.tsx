@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, AlertCircle, Loader, User } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
 
 export const Signup = () => {
   const [email, setEmail] = useState('');

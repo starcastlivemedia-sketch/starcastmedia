@@ -1,7 +1,14 @@
-import { TrendingUp, Users, Clock, FileText } from 'lucide-react';
+import { TrendingUp, Users, Clock, FileText, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const DashboardCard = ({ icon: Icon, title, value, description }) => (
+interface DashboardCardProps {
+  icon: LucideIcon;
+  title: string;
+  value: string;
+  description: string;
+}
+
+const DashboardCard = ({ icon: Icon, title, value, description }: DashboardCardProps) => (
   <div className="bg-gray-800 rounded-lg shadow-lg p-6 border-l-4 border-blue-500 hover:border-blue-400 transition">
     <div className="flex items-center justify-between">
       <div>

@@ -1,7 +1,13 @@
 import { Bell, Lock, User as UserIcon, Save } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const SettingToggle = ({ label, description, enabled }) => (
+interface SettingToggleProps {
+  label: string;
+  description: string;
+  enabled: boolean;
+}
+
+const SettingToggle = ({ label, description, enabled }: SettingToggleProps) => (
   <div className="flex items-center justify-between py-4 border-b border-gray-700 last:border-b-0">
     <div>
       <p className="font-medium text-gray-100">{label}</p>

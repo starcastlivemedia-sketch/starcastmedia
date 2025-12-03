@@ -1,6 +1,13 @@
 import { Mail } from 'lucide-react';
 
-const TeamMember = ({ name, role, email, status }) => (
+interface TeamMemberProps {
+  name: string;
+  role: string;
+  email: string;
+  status: 'online' | 'offline';
+}
+
+export const TeamMember = ({ name, role, email, status }: TeamMemberProps) => (
   <div className="bg-gray-800 rounded-lg shadow-lg p-4 border border-gray-700 hover:border-blue-500 transition">
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-4">
