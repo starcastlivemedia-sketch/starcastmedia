@@ -1,4 +1,4 @@
-import { LogOut, User, Moon, Sun } from 'lucide-react';
+import { LogOut, User, Moon, Sun, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,9 @@ export const Navbar = () => {
   const [isDark, setIsDark] = useState(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const ADMIN_EMAIL = 'raystarnes816@gmail.com';
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   const toggleDarkMode = () => {
     setIsDark(!isDark);
@@ -24,6 +27,10 @@ export const Navbar = () => {
     } catch (error) {
       console.error('Logout failed:', error);
     }
+  };
+
+  const handleAdminClick = () => {
+    navigate('/admin');
   };
 
   // Set initial dark mode on mount
@@ -46,6 +53,15 @@ export const Navbar = () => {
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
+            {isAdmin && (
+              <button
+                onClick={handleAdminClick}
+                className="flex items-center gap-2 px-3 py-2 bg-red-900 hover:bg-red-800 text-red-200 rounded-lg transition font-semibold"
+              >
+                <Shield size={20} />
+                <span>Admin</span>
+              </button>
+            )}
             <div className="flex items-center gap-2 text-gray-300">
               <User size={20} />
               <span className="text-sm">{user?.email || 'User'}</span>

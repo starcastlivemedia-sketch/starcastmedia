@@ -11,6 +11,7 @@ import { Team } from './pages/Team';
 import { Timesheet } from './pages/Timesheet';
 import { Documents } from './pages/Documents';
 import { Settings } from './pages/Settings';
+import { Admin } from './pages/Admin';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
                       <main className="flex-1 overflow-auto">
                         <Routes>
                           <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/admin" element={<Admin />} />
                           <Route path="/team" element={<Team />} />
                           <Route path="/timesheet" element={<Timesheet />} />
                           <Route path="/documents" element={<Documents />} />
