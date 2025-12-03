@@ -1,7 +1,24 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import { AlertCircle, Users, FileText, Clock, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, Users, Plus, Trash2, UserPlus } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+interface Team {
+  id: string;
+  name: string;
+  description: string;
+  created_by: string;
+}
+
+interface TeamMember {
+  id: string;
+  user_id: string;
+  team_id: string;
+  role: string;
+  joined_at: string;
+  user_email?: string;
+}
 
 export const Admin = () => {
   const { user } = useAuth();
@@ -10,11 +27,168 @@ export const Admin = () => {
   const ADMIN_EMAIL = 'raystarnes816@gmail.com';
   const isAdmin = user?.email === ADMIN_EMAIL;
 
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNewTeamForm, setShowNewTeamForm] = useState(false);
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDescription, setNewTeamDescription] = useState('');
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('member');
+
   useEffect(() => {
     if (!isAdmin) {
       navigate('/dashboard');
+    } else {
+      fetchTeams();
     }
   }, [isAdmin, navigate]);
+
+  const fetchTeams = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('teams')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setTeams(data);
+        if (data.length > 0) {
+          setSelectedTeam(data[0].id);
+          fetchTeamMembers(data[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching teams:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTeamMembers = async (teamId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('team_id', teamId)
+        .order('joined_at', { ascending: false });
+
+      if (!error && data) {
+        setTeamMembers(data);
+      }
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+    }
+  };
+
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id || !newTeamName.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .insert([
+          {
+            name: newTeamName,
+            description: newTeamDescription,
+            created_by: user.id,
+          },
+        ]);
+
+      if (!error) {
+        setNewTeamName('');
+        setNewTeamDescription('');
+        setShowNewTeamForm(false);
+        await fetchTeams();
+      }
+    } catch (err) {
+      console.error('Error creating team:', err);
+    }
+  };
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeam || !newMemberEmail.trim()) return;
+
+    try {
+      // First, find the user by email
+      const { data: userData, error: userError } = await supabase
+        .from('auth.users')
+        .select('id')
+        .eq('email', newMemberEmail)
+        .single();
+
+      if (userError || !userData) {
+        alert('User not found with that email');
+        return;
+      }
+
+      // Add member to team
+      const { error } = await supabase
+        .from('team_members')
+        .insert([
+          {
+            user_id: userData.id,
+            team_id: selectedTeam,
+            role: newMemberRole,
+          },
+        ]);
+
+      if (!error) {
+        setNewMemberEmail('');
+        setNewMemberRole('member');
+        setShowAddMemberForm(false);
+        await fetchTeamMembers(selectedTeam);
+      }
+    } catch (err) {
+      console.error('Error adding member:', err);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('Are you sure you want to remove this member from the team?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (!error && selectedTeam) {
+        await fetchTeamMembers(selectedTeam);
+      }
+    } catch (err) {
+      console.error('Error removing member:', err);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!confirm('Are you sure you want to delete this team? This will remove all members.')) return;
+
+    try {
+      // Delete team members first
+      await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', teamId);
+
+      // Delete team
+      const { error } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', teamId);
+
+      if (!error) {
+        await fetchTeams();
+      }
+    } catch (err) {
+      console.error('Error deleting team:', err);
+    }
+  };
 
   if (!isAdmin) {
     return null;
@@ -27,155 +201,201 @@ export const Admin = () => {
         <p className="text-gray-400 mt-2">Manage your Starcast Media employee portal</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 border-l-4 border-blue-500">
+      {/* Team Management Section */}
+      <div className="bg-gray-800 rounded-lg shadow-lg mb-8">
+        <div className="p-6 border-b border-gray-700">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Total Users</p>
-              <p className="text-3xl font-bold text-gray-100 mt-2">0</p>
-              <p className="text-gray-500 text-xs mt-2">Active accounts</p>
-            </div>
-            <Users className="text-blue-400" size={40} />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Teams</p>
-              <p className="text-3xl font-bold text-gray-100 mt-2">0</p>
-              <p className="text-gray-500 text-xs mt-2">Active teams</p>
-            </div>
-            <Users className="text-green-400" size={40} />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 border-l-4 border-purple-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Documents</p>
-              <p className="text-3xl font-bold text-gray-100 mt-2">0</p>
-              <p className="text-gray-500 text-xs mt-2">Uploaded files</p>
-            </div>
-            <FileText className="text-purple-400" size={40} />
-          </div>
-        </div>
-
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 border-l-4 border-orange-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Timesheets</p>
-              <p className="text-3xl font-bold text-gray-100 mt-2">0</p>
-              <p className="text-gray-500 text-xs mt-2">Pending approval</p>
-            </div>
-            <Clock className="text-orange-400" size={40} />
-          </div>
-        </div>
-      </div>
-
-      {/* Admin Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Management */}
-        <div className="bg-gray-800 rounded-lg shadow-lg">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center gap-3">
-              <Users className="text-blue-400" size={24} />
-              <h2 className="text-xl font-bold text-gray-100">User Management</h2>
-            </div>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-400 mb-4">Manage employees and their access</p>
-            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
-              View All Users
-            </button>
-            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition mt-3">
-              Add New User
-            </button>
-          </div>
-        </div>
-
-        {/* Team Management */}
-        <div className="bg-gray-800 rounded-lg shadow-lg">
-          <div className="p-6 border-b border-gray-700">
             <div className="flex items-center gap-3">
               <Users className="text-green-400" size={24} />
               <h2 className="text-xl font-bold text-gray-100">Team Management</h2>
             </div>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-400 mb-4">Create and manage teams</p>
-            <button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition">
-              View All Teams
-            </button>
-            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition mt-3">
+            <button
+              onClick={() => setShowNewTeamForm(!showNewTeamForm)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+            >
+              <Plus size={20} />
               Create Team
             </button>
           </div>
         </div>
 
-        {/* Document Management */}
-        <div className="bg-gray-800 rounded-lg shadow-lg">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center gap-3">
-              <FileText className="text-purple-400" size={24} />
-              <h2 className="text-xl font-bold text-gray-100">Document Management</h2>
-            </div>
+        {/* Create Team Form */}
+        {showNewTeamForm && (
+          <div className="p-6 bg-gray-750 border-b border-gray-700">
+            <form onSubmit={handleCreateTeam} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Team Name</label>
+                <input
+                  type="text"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., Engineering, Marketing"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                <textarea
+                  value={newTeamDescription}
+                  onChange={(e) => setNewTeamDescription(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500"
+                  placeholder="Team description..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+                >
+                  Create Team
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewTeamForm(false)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-          <div className="p-6">
-            <p className="text-gray-400 mb-4">Manage company documents and files</p>
-            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition">
-              View Documents
-            </button>
-            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition mt-3">
-              Upload Document
-            </button>
-          </div>
-        </div>
+        )}
 
-        {/* Timesheet Management */}
-        <div className="bg-gray-800 rounded-lg shadow-lg">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center gap-3">
-              <Clock className="text-orange-400" size={24} />
-              <h2 className="text-xl font-bold text-gray-100">Timesheet Management</h2>
+        {/* Teams Grid */}
+        <div className="p-6">
+          {loading ? (
+            <p className="text-gray-400">Loading teams...</p>
+          ) : teams.length === 0 ? (
+            <p className="text-gray-400">No teams yet. Create one to get started!</p>
+          ) : (
+            <div className="space-y-4">
+              {teams.map((team) => (
+                <div
+                  key={team.id}
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition ${
+                    selectedTeam === team.id
+                      ? 'border-green-500 bg-gray-700'
+                      : 'border-gray-600 bg-gray-750 hover:border-gray-500'
+                  }`}
+                  onClick={() => {
+                    setSelectedTeam(team.id);
+                    fetchTeamMembers(team.id);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-100 mb-1">{team.name}</h3>
+                      <p className="text-sm text-gray-400">{team.description}</p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTeam(team.id);
+                      }}
+                      className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-400 mb-4">Review and approve timesheets</p>
-            <button className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg transition">
-              Review Timesheets
-            </button>
-            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition mt-3">
-              Approve Pending
-            </button>
-          </div>
-        </div>
-
-        {/* Settings */}
-        <div className="bg-gray-800 rounded-lg shadow-lg lg:col-span-2">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center gap-3">
-              <Settings className="text-gray-400" size={24} />
-              <h2 className="text-xl font-bold text-gray-100">Admin Settings</h2>
-            </div>
-          </div>
-          <div className="p-6">
-            <p className="text-gray-400 mb-4">Configure system settings and preferences</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <button className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                System Settings
-              </button>
-              <button className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                Permissions
-              </button>
-              <button className="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                Logs & Reports
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Team Members Section */}
+      {selectedTeam && (
+        <div className="bg-gray-800 rounded-lg shadow-lg">
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus className="text-blue-400" size={24} />
+                <h2 className="text-xl font-bold text-gray-100">Team Members</h2>
+              </div>
+              <button
+                onClick={() => setShowAddMemberForm(!showAddMemberForm)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+              >
+                <Plus size={20} />
+                Add Member
+              </button>
+            </div>
+          </div>
+
+          {/* Add Member Form */}
+          {showAddMemberForm && (
+            <div className="p-6 bg-gray-750 border-b border-gray-700">
+              <form onSubmit={handleAddMember} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Member Email</label>
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-blue-500"
+                    placeholder="member@example.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Role</label>
+                  <select
+                    value={newMemberRole}
+                    onChange={(e) => setNewMemberRole(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="member">Member</option>
+                    <option value="lead">Team Lead</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                  >
+                    Add Member
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMemberForm(false)}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Members List */}
+          <div className="p-6">
+            {teamMembers.length === 0 ? (
+              <p className="text-gray-400">No members in this team yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-gray-100">{member.user_email || member.user_id}</p>
+                      <p className="text-sm text-gray-400 capitalize">{member.role}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveMember(member.id)}
+                      className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Admin Info */}
       <div className="mt-8 bg-gray-900 border border-gray-700 rounded-lg p-6">
@@ -183,7 +403,7 @@ export const Admin = () => {
           <AlertCircle className="text-blue-400 flex-shrink-0 mt-1" size={24} />
           <div>
             <h3 className="text-lg font-semibold text-gray-100 mb-2">Admin Access</h3>
-            <p className="text-gray-400">You are logged in as an administrator. You have full access to manage users, teams, documents, and timesheets. Use this power responsibly.</p>
+            <p className="text-gray-400">You are logged in as an administrator. Use the team management section above to create teams, add members, and manage your organization structure.</p>
           </div>
         </div>
       </div>

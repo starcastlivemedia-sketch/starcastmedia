@@ -1,5 +1,7 @@
-import { TrendingUp, Users, Clock, FileText, type LucideIcon } from 'lucide-react';
+import { TrendingUp, Users, Clock, FileText, type LucideIcon, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface DashboardCardProps {
   icon: LucideIcon;
@@ -23,6 +25,34 @@ const DashboardCard = ({ icon: Icon, title, value, description }: DashboardCardP
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  const [hasTeam, setHasTeam] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkTeamAssignment = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          setHasTeam(true);
+        } else {
+          setHasTeam(false);
+        }
+      } catch (err) {
+        console.error('Error checking team assignment:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkTeamAssignment();
+  }, [user?.id]);
 
   return (
     <div className="p-8">
@@ -30,6 +60,27 @@ export const Dashboard = () => {
         <h1 className="text-3xl font-bold text-gray-100">Welcome, {user?.email?.split('@')[0]}</h1>
         <p className="text-gray-400 mt-2">Here's your employee dashboard overview.</p>
       </div>
+
+      {/* Team Status Alert */}
+      {!loading && !hasTeam && (
+        <div className="mb-8 flex items-start gap-4 p-4 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+          <AlertCircle className="text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="font-semibold text-yellow-200 mb-1">No Team Assignment</h3>
+            <p className="text-yellow-300 text-sm">You haven't been assigned to a team yet. Contact your administrator to get added to a team.</p>
+          </div>
+        </div>
+      )}
+
+      {!loading && hasTeam && (
+        <div className="mb-8 flex items-start gap-4 p-4 bg-green-900/20 border border-green-500/50 rounded-lg">
+          <Users className="text-green-400 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="font-semibold text-green-200 mb-1">Team Assigned</h3>
+            <p className="text-green-300 text-sm">You are part of a team. Check the Team section to see your team members.</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <DashboardCard
