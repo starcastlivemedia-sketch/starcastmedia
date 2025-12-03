@@ -42,9 +42,17 @@ export const Navbar = () => {
     <nav className="bg-gray-900 shadow-lg border-b border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-blue-400">Starcast Media</h1>
-            <span className="ml-4 text-gray-400 text-sm">Employee Panel</span>
+          <div className="flex items-center gap-3">
+            <img 
+              src="https://ytepzyundsauhctalwgw.supabase.co/storage/v1/object/public/logo/logo" 
+              alt="Starcast Media Logo"
+              className="h-14 w-14 rounded-full object-cover"
+              style={{ transform: 'scale(1.1)' }}
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-blue-400">Starcast Media</h1>
+              <span className="text-gray-400 text-xs">Employee Panel</span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <button
