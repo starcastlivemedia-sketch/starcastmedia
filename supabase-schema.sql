@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS team_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  team_id UUID NOT NULL,
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   role VARCHAR(100),
   joined_at TIMESTAMP DEFAULT now(),
   UNIQUE(user_id, team_id)
@@ -127,19 +127,38 @@ CREATE POLICY "Users can delete their own documents" ON documents
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for team_members table
-CREATE POLICY "Users can view team members in their teams" ON team_members
+CREATE POLICY "Users can view their own memberships" ON team_members
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Team creators can view team members" ON team_members
   FOR SELECT USING (
-    auth.uid() = user_id OR auth.uid() IN (
-      SELECT user_id FROM team_members WHERE team_id IN (
-        SELECT team_id FROM team_members WHERE user_id = auth.uid()
-      )
-    )
+    auth.uid() IN (SELECT created_by FROM teams WHERE id = team_id)
+  );
+
+CREATE POLICY "Team creators can add members" ON team_members
+  FOR INSERT WITH CHECK (
+    auth.uid() IN (SELECT created_by FROM teams WHERE id = team_id)
+  );
+
+CREATE POLICY "Team creators can remove members" ON team_members
+  FOR DELETE USING (
+    auth.uid() IN (SELECT created_by FROM teams WHERE id = team_id)
   );
 
 -- RLS Policies for teams table
-CREATE POLICY "Users can view teams they are part of" ON teams
+CREATE POLICY "Users can create teams" ON teams
+  FOR INSERT WITH CHECK (created_by = auth.uid());
+
+CREATE POLICY "Users can view teams they created" ON teams
+  FOR SELECT USING (created_by = auth.uid());
+
+CREATE POLICY "Users can view teams they are members of" ON teams
   FOR SELECT USING (
-    created_by = auth.uid() OR id IN (
-      SELECT team_id FROM team_members WHERE user_id = auth.uid()
-    )
+    id IN (SELECT team_id FROM team_members WHERE user_id = auth.uid())
   );
+
+CREATE POLICY "Team creators can update their teams" ON teams
+  FOR UPDATE USING (created_by = auth.uid());
+
+CREATE POLICY "Team creators can delete their teams" ON teams
+  FOR DELETE USING (created_by = auth.uid());

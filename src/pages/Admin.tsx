@@ -37,6 +37,8 @@ export const Admin = () => {
   const [newTeamDescription, setNewTeamDescription] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (!isAdmin) {
@@ -86,65 +88,109 @@ export const Admin = () => {
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id || !newTeamName.trim()) return;
+    setError('');
+    setSuccess('');
+    
+    if (!user?.id || !newTeamName.trim()) {
+      setError('Team name is required');
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('teams')
         .insert([
           {
-            name: newTeamName,
-            description: newTeamDescription,
+            name: newTeamName.trim(),
+            description: newTeamDescription.trim(),
             created_by: user.id,
           },
         ]);
 
-      if (!error) {
-        setNewTeamName('');
-        setNewTeamDescription('');
-        setShowNewTeamForm(false);
-        await fetchTeams();
+      if (insertError) {
+        setError('Failed to create team: ' + insertError.message);
+        return;
       }
+
+      setNewTeamName('');
+      setNewTeamDescription('');
+      setShowNewTeamForm(false);
+      setSuccess('Team created successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      await fetchTeams();
     } catch (err) {
+      setError('Error creating team: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error('Error creating team:', err);
     }
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTeam || !newMemberEmail.trim()) return;
+    setError('');
+    setSuccess('');
+    
+    if (!selectedTeam || !newMemberEmail.trim()) {
+      setError('Please select a team and enter an email');
+      return;
+    }
 
     try {
-      // First, find the user by email
-      const { data: userData, error: userError } = await supabase
-        .from('auth.users')
-        .select('id')
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newMemberEmail)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+
+      // Query employees table to find user_id by email
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('user_id, email')
         .eq('email', newMemberEmail)
         .single();
 
-      if (userError || !userData) {
-        alert('User not found with that email');
+      if (employeeError) {
+        if (employeeError.code === 'PGRST116') {
+          setError('Employee with that email not found. Please have them sign up and create their profile first.');
+        } else {
+          setError('Error looking up employee: ' + employeeError.message);
+        }
+        return;
+      }
+
+      if (!employeeData) {
+        setError('Employee with that email not found');
         return;
       }
 
       // Add member to team
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('team_members')
         .insert([
           {
-            user_id: userData.id,
+            user_id: employeeData.user_id,
             team_id: selectedTeam,
             role: newMemberRole,
           },
         ]);
 
-      if (!error) {
-        setNewMemberEmail('');
-        setNewMemberRole('member');
-        setShowAddMemberForm(false);
-        await fetchTeamMembers(selectedTeam);
+      if (insertError) {
+        if (insertError.code === '23505') {
+          setError('This employee is already a member of this team');
+        } else {
+          setError('Error adding member: ' + insertError.message);
+        }
+        return;
       }
+
+      setNewMemberEmail('');
+      setNewMemberRole('member');
+      setShowAddMemberForm(false);
+      setSuccess('Team member added successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      await fetchTeamMembers(selectedTeam);
     } catch (err) {
+      setError('An unexpected error occurred: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error('Error adding member:', err);
     }
   };
@@ -152,22 +198,36 @@ export const Admin = () => {
   const handleRemoveMember = async (memberId: string) => {
     if (!confirm('Are you sure you want to remove this member from the team?')) return;
 
+    setError('');
+    setSuccess('');
+
     try {
       const { error } = await supabase
         .from('team_members')
         .delete()
         .eq('id', memberId);
 
-      if (!error && selectedTeam) {
+      if (error) {
+        setError('Failed to remove member: ' + error.message);
+        return;
+      }
+
+      if (selectedTeam) {
         await fetchTeamMembers(selectedTeam);
+        setSuccess('Team member removed successfully!');
+        setTimeout(() => setSuccess(''), 3000);
       }
     } catch (err) {
+      setError('Error removing member: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error('Error removing member:', err);
     }
   };
 
   const handleDeleteTeam = async (teamId: string) => {
     if (!confirm('Are you sure you want to delete this team? This will remove all members.')) return;
+
+    setError('');
+    setSuccess('');
 
     try {
       // Delete team members first
@@ -182,10 +242,16 @@ export const Admin = () => {
         .delete()
         .eq('id', teamId);
 
-      if (!error) {
-        await fetchTeams();
+      if (error) {
+        setError('Failed to delete team: ' + error.message);
+        return;
       }
+
+      await fetchTeams();
+      setSuccess('Team deleted successfully!');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
+      setError('Error deleting team: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error('Error deleting team:', err);
     }
   };
@@ -200,6 +266,38 @@ export const Admin = () => {
         <h1 className="text-4xl font-bold text-gray-100">Admin Panel</h1>
         <p className="text-gray-400 mt-2">Manage your Starcast Media employee portal</p>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg flex items-start gap-3">
+          <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+          <div className="flex-1">
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+          <button
+            onClick={() => setError('')}
+            className="text-red-400 hover:text-red-300 text-xl"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Success Alert */}
+      {success && (
+        <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg flex items-start gap-3">
+          <AlertCircle className="text-green-400 flex-shrink-0 mt-0.5" size={20} />
+          <div className="flex-1">
+            <p className="text-green-300 text-sm">{success}</p>
+          </div>
+          <button
+            onClick={() => setSuccess('')}
+            className="text-green-400 hover:text-green-300 text-xl"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Team Management Section */}
       <div className="bg-gray-800 rounded-lg shadow-lg mb-8">
